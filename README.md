@@ -5,8 +5,10 @@ socks server to a host port. Combined with proxychains, this creates your very o
 private botnet.
 
 ## Setup
-- Create a `VPN` folder in the root of the project and ensure that the `auth-user-pass` directive
+- Create a `VPN` folder in the root of the project 
+- Fill it with `*.ovpn` files and ensure that the `auth-user-pass` directive
   in your `./VPN/*.ovpn` files says `auth-user-pass auth.txt`
+   - maybe `wget https://www.privateinternetaccess.com/openvpn/openvpn.zip`?
 - Create an `auth.txt` file with your ovpn credentials in `VPN`
 - Run `./doxycannon.sh -b` to build your image
 - Run `./doxycannon.sh -u` to bring your containers up
