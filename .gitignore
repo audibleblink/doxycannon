@@ -1,0 +1,4 @@
+*.ovpn
+auth.txt
+proxychains.conf
+VPN/*
