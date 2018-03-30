@@ -32,8 +32,7 @@ curl --socks5 localhost:50xx ipconfig.io/json
 ```
 
 ![](https://i.imgur.com/jjHtk9L.png)
-![](https://i.imgur.com/IIPauuO.png)
-![](https://i.imgur.com/qRIMl2a.png)
+![](https://i.imgur.com/fLU4Mjx.png)
 
 ### Credit
 [pry0cc](https://github.com/pry0cc/ProxyDock) for the idea
