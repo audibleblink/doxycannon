@@ -56,6 +56,12 @@ This was originally a fork of pry0cc/ProxyDock but it's been modified for my nee
 where less than 5% of the origin code remains.
 
 ## TODO
-I plan on replacing `doxycannon.sh` with a python script that uses the Docker SDK so I can keep
-state over which containers have been used for a given command and provide an interactive REPL that
-allows commands to be executed through each of the nodes in parallel.
+
+- [X] Interactive mode
+- [ ] Python management script
+  - [ ] Faster Up/Down Container management
+  - [ ] Abitlity to run a single command 1 time through each proxy withouth repeats
+  - [ ] Allow for management of remote doxycannon installs through the Docker API
+
+- [ ] Dispatch server - (will allow GUI applications to use doxycannon)
+  - [ ] Creates a single local proxy server that dispatches through VPNs
