@@ -18,7 +18,7 @@ function doxycannon() {
     # starting port
     port=5000
 
-    for file in $(find VPN -name *.ovpn); do
+    for file in $(find VPN -maxdepth 1 -name *.ovpn); do
         echo "socks5 127.0.0.1 ${port}" >> proxychains.conf
         name="$(basename -s .ovpn ${file})"
         docker run --rm -d --privileged \
