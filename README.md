@@ -30,6 +30,11 @@ proxychains4 -q hydra -L users.txt -p Winter2018 manager.example.com -t 8 ssh
 proxychains4 -q gobuster -w word.list -h http://manager.example.com
 ```
 
+### GUI Tools
+In this repo, checkout out the [haproxy](haproxy) folder to create a proxy rotator. This will allow
+you rotate through your proxies from a single port which means you can point your browsers or
+BURPSuite instances at it and have every request use a different VPN.
+
 ### Specific SOCKS proxies
 If you want to use a specific proxy, give your utility the proper SOCKS port.
 
