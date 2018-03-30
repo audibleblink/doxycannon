@@ -73,5 +73,5 @@ where less than 5% of the origin code remains.
   - [ ] Abitlity to run a single command 1 time through each proxy withouth repeats
   - [ ] Allow for management of remote doxycannon installs through the Docker API
 
-- [ ] Dispatch server - (will allow GUI applications to use doxycannon)
-  - [ ] Creates a single local proxy server that dispatches through VPNs
+- [X] Dispatch server - (will allow GUI applications to use doxycannon)
+  - [X] Creates a single local proxy server that dispatches through VPNs
