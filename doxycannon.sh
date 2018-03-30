@@ -17,12 +17,12 @@ function doxycannon() {
     # starting port
     port=5000
 
-    for f in $(find VPN -name *.ovpn); do
-        echo "socks5 127.0.0.1 $port" >> proxychains.conf
-        name="$(echo $f | cut -d '/' -f 2)"
+    for file in $(find VPN -name *.ovpn); do
+        echo "socks5 127.0.0.1 ${port}" >> proxychains.conf
+        name="$(basename -s .ovpn ${file})"
         docker run --rm -d --privileged \
-            -p 127.0.0.1:$port:1080 \
-            -e "VPN=$name" \
+            -p ${port}:1080 \
+            -e "VPN=${name}" \
             --name="${name}" \
             --dns=8.8.8.8 \
             audibleblink/doxycannon
