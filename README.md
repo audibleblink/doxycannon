@@ -14,23 +14,38 @@ private botnet.
 - Run `./doxycannon.sh -u` to bring your containers up
 - Run `./doxycannon.sh -d` to bring your containers down
 
+## Usage
+
+### One-off, random commands
 While your containers are up, you can use proxychains to issue commands through random proxies
 
 ```sh
-proxychains curl -s ipconfing.io/json
+proxychains4 -q curl -s ipconfing.io/json
+proxychains4 -q hydra -L users.txt -p Winter2018 manager.example.com -t 8 ssh
+proxychains4 -q gobuster -w word.list -h http://manager.example.com
 ```
 
-If you want to use a specific proxy, give your utility the proper SOCKS port
+### Specific SOCKS proxies
+If you want to use a specific proxy, give your utility the proper SOCKS port.
+
+IE: To make a request through Japan, use `docker ps` to find the local port the Japanese proxy is
+bound to.
+
+Then configure you tool to use that port:
 
 ```sh
-# To issue a command through Japan:
-# Find the port the Japanese server is bound to
-docker ps
-
-# Configure your utility to use that port
 curl --socks5 localhost:50xx ipconfig.io/json
 ```
 
+### Interactive
+Once you've built your image and started your containers, run the utility with the `-i` flag to get
+a bash session where all network traffic is redirected through proxychains4
+
+```sh
+./doxycannon.sh -i
+```
+
+## Screenshots
 ![](https://i.imgur.com/jjHtk9L.png)
 ![](https://i.imgur.com/fLU4Mjx.png)
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 
 read -r -d '' help <<-HELP
-Usage: $0 [-u] [-d] [-b]
+Usage: $0 [-u] [-d] [-b] [-i]
 
 -u      Brings up a Docker container for each ovpn file in ./VPN
 -d      Downs all Docker containers
 -b      Builds the required Docker image
+-i      Starts an interactive shell with proxied network connections. Requires running containers
 HELP
 
 function usage() { echo "$help" 1>&2; exit 1; }
@@ -30,6 +31,10 @@ function doxycannon() {
     done
 }
 
+function interactive() {
+    proxychains4 bash
+}
+
 function build() {
     docker build -t audibleblink/doxycannon .
 }
@@ -40,7 +45,7 @@ function down() {
 
 [ -z $@ ] && usage
 
-while getopts 'dbu' opt; do
+while getopts 'dbui' opt; do
     case "${opt}" in
         b)
             build
@@ -50,6 +55,9 @@ while getopts 'dbu' opt; do
             ;;
         u)
             doxycannon
+            ;;
+        i)
+            interactive
             ;;
         *)
             usage
