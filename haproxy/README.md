@@ -14,4 +14,6 @@ docker build -t haproxy .
 docker run --rm --network host --name doxyproxy haproxy
 ```
 
+Alternatively, you can run doxycannon with the `--single` flag
+
 Then just point {burp,firefox,etc} at socks5://127.0.0.1:1337

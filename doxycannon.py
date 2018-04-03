@@ -54,11 +54,11 @@ backend doxycannon
 doxy = docker.from_env()
 
 
-def build(image_name):
+def build(image_name, path='.'):
     """Builds the image with the given name"""
     try:
-        doxy.images.build(path='.', tag=image_name)
-        message = "[*] Image {} built.\nUse --up to bring up containers"
+        doxy.images.build(path=path, tag=image_name)
+        message = '[*] Image {} built.'
         print message.format(image_name)
     except Exception as err:
         print err
@@ -179,7 +179,7 @@ def start_containers(image_name, ovpn_queue, port_range):
 
 
 def up(image):
-    """Kick off the `up` process
+    """Kick off the `up` process that starts all the containers
 
     Writes the configuration files and starts starts container based
     on the number of *.ovpn files in the VPN folder
@@ -190,6 +190,44 @@ def up(image):
     write_haproxy_conf(port_range)
     write_proxychains_conf(port_range)
     start_containers(image, ovpn_file_queue, port_range)
+
+
+def single(image):
+    """Starts an HAProxy rotator.
+
+    Builds and starts the HAProxy container in the haproxy folder
+    This will create a local socks5 proxy on port 1337 that will
+    allow one to configure applications with SOCKS proxy options.
+    Ex: Firefox, BurpSuite, etc.
+    """
+    import signal
+    import sys
+
+    name = 'doxyproxy'
+
+    def signal_handler(*args):
+        """Traps ctrl+c for cleanup, then exits"""
+        sys.stdout = open(os.devnull, 'w')
+        down(name)
+        sys.stdout = sys.__stdout__
+        print '\n[*] {} was issued a stop command'.format(name)
+        print '[*] Your proxies are still running.'
+        sys.exit(0)
+
+    try:
+        if not list(containers_from_image(image).queue):
+            up(image)
+        else:
+            ovpn_file_count = len(list(vpn_file_queue('VPN').queue))
+            port_range = range(START_PORT, START_PORT + ovpn_file_count)
+            write_haproxy_conf(port_range)
+        build(name, path='./haproxy')
+        print '[*] Staring single-port mode. Ctrl-c to quit'
+        signal.signal(signal.SIGINT, signal_handler)
+        doxy.containers.run(name, network='host', name=name, auto_remove=True)
+    except Exception as err:
+        print err
+        raise
 
 
 def interactive(image):
@@ -233,6 +271,12 @@ def main():
         dest='down',
         help='Bring down all the containers')
     parser.add_argument(
+        '--single',
+        action='store_true',
+        default=False,
+        dest='single',
+        help='Start an HAProxy rotator on a single port. Useful for Burpsuite')
+    parser.add_argument(
         '--interactive',
         action='store_true',
         default=False,
@@ -253,6 +297,8 @@ def main():
         down(IMAGE)
     elif args.interactive:
         interactive(IMAGE)
+    elif args.single:
+        single(IMAGE)
 
 
 if __name__ == "__main__":
