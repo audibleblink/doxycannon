@@ -4,15 +4,27 @@ Doxycannon takes a pool of OpenVPN files and creates a Docker container for each
 socks server to a host port. Combined with proxychains, this creates your very own cheap and fast
 private botnet.
 
+## Prerequisites
+- Install the required pip modules:
+```sh
+pip install -r requirements.txt
+```
+- Ensure docker is installed and enabled. Refer to the [Wiki](../../wiki/installing-docker)
+for installation instructions on Kali/Debian
+- `proxychains4` is required for interactive mode
+
 ## Setup
-- Create a `VPN` folder in the root of the project 
-- Fill it with `*.ovpn` files and ensure that the `auth-user-pass` directive
+- Create an `auth.txt` file with your ovpn credentials in `VPN`. Format is:
+  ```txt
+  username
+  password
+  ```
+- Fill the VPN folder with `*.ovpn` files and ensure that the `auth-user-pass` directive
   in your `./VPN/*.ovpn` files says `auth-user-pass auth.txt`
-   - maybe `wget https://www.privateinternetaccess.com/openvpn/openvpn.zip`?
-- Create an `auth.txt` file with your ovpn credentials in `VPN`
-- Run `./doxycannon.sh -b` to build your image
-- Run `./doxycannon.sh -u` to bring your containers up
-- Run `./doxycannon.sh -d` to bring your containers down
+   - Watch [this wiki section](../../wiki#getting-started-with-vpn-providers) for installation tips
+     on individual VPN providers
+- Run `./doxycannon.py --build` to build your image with your OVPN files
+  - `--build` will need to be run on code changes or when you modify the `VPN` folder's contents
 
 ## Usage
 
@@ -38,21 +50,21 @@ BURPSuite instances at it and have every request use a different VPN.
 ### Specific SOCKS proxies
 If you want to use a specific proxy, give your utility the proper SOCKS port.
 
-IE: To make a request through Japan, use `docker ps` to find the local port the Japanese proxy is
-bound to.
+Example: To make a request through Japan, use `docker ps` and find the local port to which the
+Japanese proxy is bound.
 
-Then configure you tool to use that port:
+Configure your tool to use that port:
 
 ```sh
 curl --socks5 localhost:50xx ipconfig.io/json
 ```
 
 ### Interactive
-Once you've built your image and started your containers, run the utility with the `-i` flag to get
-a bash session where all network traffic is redirected through proxychains4
+Once you've built your image and started your containers, run the utility with the `--interactive`
+flag to get a bash session where all network traffic is redirected through proxychains4
 
 ```sh
-./doxycannon.sh -i
+./doxycannon.py --interactive
 ```
 
 ## Screenshots
@@ -62,15 +74,14 @@ a bash session where all network traffic is redirected through proxychains4
 ### Credit
 [pry0cc](https://github.com/pry0cc/ProxyDock) for the idea
 
-This was originally a fork of pry0cc/ProxyDock but it's been modified for my needs to an extent
-where less than 5% of the origin code remains.
+This was originally a fork of pry0cc's ProxyDock. It's been modified to an extent where less than
+1% of the original code remains.
 
 ## TODO
 
 - [X] Interactive mode
-- [ ] Python management script
-  - [ ] Faster Up/Down Container management
-  - [ ] Abitlity to run a single command 1 time through each proxy withouth repeats
+- [X] Python management script
+  - [X] Faster Up/Down Container management
   - [ ] Allow for management of remote doxycannon installs through the Docker API
 
 - [X] Dispatch server - (will allow GUI applications to use doxycannon)
