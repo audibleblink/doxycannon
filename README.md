@@ -90,9 +90,8 @@ flag to get a bash session where all network traffic is redirected through proxy
 ./doxycannon.py --interactive
 ```
 
-## Screenshots
-![](https://i.imgur.com/jjHtk9L.png)
-![](https://i.imgur.com/fLU4Mjx.png)
+## Demo
+[![asciicast](https://asciinema.org/a/YaRyhghHQuBw8Hm3mia5KMewP.png)](https://asciinema.org/a/YaRyhghHQuBw8Hm3mia5KMewP)
 
 ### Credit
 [pry0cc](https://github.com/pry0cc/ProxyDock) for the idea
