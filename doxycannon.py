@@ -48,10 +48,14 @@ backend doxycannon
 """
 
 doxy = docker.from_env()
-# def start_containers_from_image(image_name):
 
-def build_image():
-    return doxy.images.build(path='.', tag=IMAGE)
+def build(image_name):
+    try:
+        image = doxy.images.build(path='.', tag=image_name)
+        print "[*] Image {} built. Use --up to bring up your containers".format(image_name)
+    except Exception as err:
+        print err
+        raise
 
 def vpn_file_queue(dir):
     files = glob.glob(dir + '/*.ovpn')
@@ -69,24 +73,31 @@ def write_config(filename, data, type):
         for line in data:
             file.write(line + "\n")
 
-def write_haproxy_conf(size):
+# Writes the HAProxy config file in `./haproxy` to reflect the number
+# of Docker containers about to be started
+def write_haproxy_conf(port_range):
+    print "[+] Writing HAProxy configuration"
     conf_line = "\tserver doxy{} 127.0.0.1:{} check"
-    data = list(map(lambda x: conf_line.format(x,x), range(START_PORT, START_PORT + size)))
+    data = list(map(lambda x: conf_line.format(x,x), port_range))
     write_config(HAPROXY_CONF, data, 'haproxy')
 
-def write_proxychains_conf(size):
+# Writes the Proxychains config file to reflect the number
+# of Docker containers about to be started
+def write_proxychains_conf(port_range):
+    print "[+] Writing Proxychains configuration"
     conf_line = "socks5 127.0.0.1 {}"
-    data = list(map(lambda x: conf_line.format(x), range(START_PORT, START_PORT + size)))
+    data = list(map(lambda x: conf_line.format(x), port_range))
     write_config(PROXYCHAINS_CONF, data, 'proxychains')
 
-# return a Queue of containers whosw source image match the given image name
+# Returns a Queue of containers whose source image match the given image name
 def containers_from_image(image_name):
     jobs = Queue(maxsize=0)
-    containers = list(filter(lambda x: x == image_name, doxy.containers.list()))
+    filter_func = lambda x: image_name in x.attrs['Config']['Image']
+    containers = list(filter(filter_func, doxy.containers.list()))
     [ jobs.put(container) for container in containers ]
     return jobs
 
-# Handle to job killer
+# Handle to job killer. Called by the Thread worker function.
 def multikill(jobs):
     while True:
         container = jobs.get()
@@ -167,11 +178,13 @@ def main():
     args = parser.parse_args()
 
     if args.build:
-        print 'building'
+        build(IMAGE)
     elif args.up:
         up(IMAGE)
     elif args.down:
-        stop_containers_from_image(IMAGE)
+        down(IMAGE)
+    elif args.interactive:
+        interactive(IMAGE)
 
 if __name__ == "__main__":
     main()
