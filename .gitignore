@@ -4,3 +4,4 @@ proxychains.conf
 *.crt
 *.cert
 *.pem
+haproxy.cfg
