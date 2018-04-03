@@ -1,5 +1,7 @@
 # doxycannon
 
+[![CodeFactor](https://www.codefactor.io/repository/github/audibleblink/doxycannon/badge)](https://www.codefactor.io/repository/github/audibleblink/doxycannon)
+
 Doxycannon takes a pool of OpenVPN files and creates a Docker container for each one that binds a
 socks server to a host port. Combined with proxychains, this creates your very own cheap and fast
 private botnet.
