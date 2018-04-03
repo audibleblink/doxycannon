@@ -43,9 +43,30 @@ proxychains4 -q gobuster -w word.list -h http://manager.example.com
 ```
 
 ### GUI Tools
-In this repo, checkout out the [haproxy](haproxy) folder to create a proxy rotator. This will allow
-you rotate through your proxies from a single port which means you can point your browsers or
-BURPSuite instances at it and have every request use a different VPN.
+
+Use the `--single` flag to bring up your proxies and create a proxy rotator.
+
+```sh
+~/code/doxycannon  proxy_start                                                                                                             10m
+❯❯ ./doxycannon.py --single
+[+] Writing HAProxy configuration
+[+] Writing Proxychains4 configuration
+Starting: Mexico
+Starting: Germany
+Starting: Brazil
+Starting: Japan
+[+] All containers have been issued a start command
+[*] Image doxyproxy built.
+[*] Staring single-port mode. Ctrl-c to quit
+^C
+[*] doxyproxy was issued a stop command
+[*] Your proxies are still running.
+```
+
+To see what's happening, checkout out the [haproxy](haproxy) folder. Essentially, one is building 
+a layer 4 load-balancer between all the VPNs. This will allow you rotate through your proxies from
+a single port which means you can point your browsers or BURPSuite instances at it and have every
+request use a different VPN.
 
 ### Specific SOCKS proxies
 If you want to use a specific proxy, give your utility the proper SOCKS port.

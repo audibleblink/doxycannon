@@ -222,7 +222,8 @@ def single(image):
             port_range = range(START_PORT, START_PORT + ovpn_file_count)
             write_haproxy_conf(port_range)
         build(name, path='./haproxy')
-        print '[*] Staring single-port mode. Ctrl-c to quit'
+        print '[*] Staring single-port mode...'
+        print '[*] Proxy rotator listening on port 1337. Ctrl-c to quit'
         signal.signal(signal.SIGINT, signal_handler)
         doxy.containers.run(name, network='host', name=name, auto_remove=True)
     except Exception as err:
