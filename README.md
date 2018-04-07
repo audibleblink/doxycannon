@@ -20,15 +20,15 @@ the cheap.
 - `proxychains4` is required for interactive mode
 
 ## Setup
-- Create an `auth.txt` file with your ovpn credentials in `VPN`. Format is:
+- Create an `auth.txt` file with your ovpn credentials in `VPN`. The format is:
   ```txt
   username
   password
   ```
-- Fill the VPN folder with `*.ovpn` files and ensure that the `auth-user-pass` directive
-  in your `./VPN/*.ovpn` files says `auth-user-pass auth.txt`
-   - Watch [this wiki section](../../wiki#getting-started-with-vpn-providers)
-     for installation tips on individual VPN providers
+- Fill the VPN folder with `*.ovpn` files and ensure that the `auth-user-pass`
+  directive in your `./VPN/*.ovpn` files says `auth-user-pass auth.txt`
+   - Check out [this wiki section](../../wiki#getting-started-with-vpn-providers)
+     for installation instructions for individual VPN providers
 - Run `./doxycannon.py --build` to build your image with your OVPN files
   - `--build` will need to be run on code changes or when you modify the `VPN`
     folder's contents
@@ -55,20 +55,16 @@ proxychains4 -q gobuster -w word.list -h http://manager.example.com
 Use the `--single` flag to bring up your proxies and create a proxy rotator.
 
 ```sh
-~/code/doxycannon  proxy_start                                                                                                             10m
+hgfs/shared/doxycannon  master 
 ❯❯ ./doxycannon.py --single
 [+] Writing HAProxy configuration
-[+] Writing Proxychains4 configuration
-Starting: Mexico
-Starting: Germany
-Starting: Brazil
-Starting: Japan
-[+] All containers have been issued a start command
 [*] Image doxyproxy built.
-[*] Staring single-port mode. Ctrl-c to quit
+[*] Staring single-port mode...
+[*] Proxy rotator listening on port 1337. Ctrl-c to quit
 ^C
 [*] doxyproxy was issued a stop command
 [*] Your proxies are still running.
+
 ```
 
 To see what's happening, checkout out the [haproxy](haproxy) folder.
