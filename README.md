@@ -37,8 +37,10 @@ the cheap.
 
 _note: the way proxychains seeds its PRNG to choose a random proxy is not fast
 enough to ensure each subsequent request goes out through a different IP. You
-may get about between 2-10 requests being made from the same IP. If this is
-unacceptable, check out my fork at http://github.com/audibleblink/proxychains_
+may get between 1-10 requests being made from the same IP. If this is
+unacceptable, I [merged a patch](https://github.com/haad/proxychains/pull/73)
+to the original proxychains repo. Download and build from master to get the
+fix. https://github.com/haad/proxychains_
 
 ### One-off, random commands
 While your containers are up, you can use proxychains to issue commands through
