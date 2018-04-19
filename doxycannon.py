@@ -1,11 +1,17 @@
 #!/usr/bin/env python2
 import argparse
-import docker
 import glob
-import re
 import os
-from Queue import Queue
+import re
 from threading import Thread
+
+import docker
+
+try:
+    from Queue import Queue  # Python 2
+except NameError:
+    from queue import Queue  # Python 3
+
 
 VERSION = '0.2.0'
 IMAGE = 'audibleblink/doxycannon'
@@ -59,9 +65,9 @@ def build(image_name, path='.'):
     try:
         doxy.images.build(path=path, tag=image_name)
         message = '[*] Image {} built.'
-        print message.format(image_name)
+        print(message.format(image_name))
     except Exception as err:
-        print err
+        print(err)
         raise
 
 
@@ -92,7 +98,7 @@ def write_config(filename, data, conf_type):
 
 def write_haproxy_conf(port_range):
     """Generates HAProxy config based on # of ovpn files"""
-    print "[+] Writing HAProxy configuration"
+    print("[+] Writing HAProxy configuration")
     conf_line = "\tserver doxy{} 127.0.0.1:{} check"
     data = list(map(lambda x: conf_line.format(x, x), port_range))
     write_config(HAPROXY_CONF, data, 'haproxy')
@@ -100,7 +106,7 @@ def write_haproxy_conf(port_range):
 
 def write_proxychains_conf(port_range):
     """Generates Proxychains4 config based on # of ovpn files"""
-    print "[+] Writing Proxychains4 configuration"
+    print("[+] Writing Proxychains4 configuration")
     conf_line = "socks5 127.0.0.1 {}"
     data = list(map(lambda x: conf_line.format(x), port_range))
     write_config(PROXYCHAINS_CONF, data, 'proxychains')
@@ -124,7 +130,7 @@ def multikill(jobs):
     """Handler to job killer. Called by the Thread worker function."""
     while True:
         container = jobs.get()
-        print 'Stopping: {}'.format(container.name)
+        print('Stopping: {}'.format(container.name))
         container.kill(9)
         jobs.task_done()
 
@@ -139,7 +145,7 @@ def down(image_name):
         worker.setDaemon(True)
         worker.start()
     container_queue.join()
-    print '[+] All containers have been issued a kill commaand'
+    print('[+] All containers have been issued a kill commaand')
 
 
 def multistart(image_name, jobs, ports):
@@ -148,7 +154,7 @@ def multistart(image_name, jobs, ports):
         port = ports.get()
         ovpn_basename = os.path.basename(jobs.get())
         ovpn_stub = re.sub("\.ovpn", "", ovpn_basename)
-        print 'Starting: {}'.format(ovpn_stub)
+        print('Starting: {}'.format(ovpn_stub))
         doxy.containers.run(
             image_name,
             auto_remove=True,
@@ -175,7 +181,7 @@ def start_containers(image_name, ovpn_queue, port_range):
         worker.setDaemon(True)
         worker.start()
     ovpn_queue.join()
-    print '[+] All containers have been issued a start command'
+    print('[+] All containers have been issued a start command')
 
 
 def up(image):
@@ -210,8 +216,8 @@ def single(image):
         sys.stdout = open(os.devnull, 'w')
         down(name)
         sys.stdout = sys.__stdout__
-        print '\n[*] {} was issued a stop command'.format(name)
-        print '[*] Your proxies are still running.'
+        print('\n[*] {} was issued a stop command'.format(name))
+        print('[*] Your proxies are still running.')
         sys.exit(0)
 
     try:
@@ -222,12 +228,12 @@ def single(image):
             port_range = range(START_PORT, START_PORT + ovpn_file_count)
             write_haproxy_conf(port_range)
         build(name, path='./haproxy')
-        print '[*] Staring single-port mode...'
-        print '[*] Proxy rotator listening on port 1337. Ctrl-c to quit'
+        print('[*] Staring single-port mode...')
+        print('[*] Proxy rotator listening on port 1337. Ctrl-c to quit')
         signal.signal(signal.SIGINT, signal_handler)
         doxy.containers.run(name, network='host', name=name, auto_remove=True)
     except Exception as err:
-        print err
+        print(err)
         raise
 
 
@@ -247,7 +253,7 @@ def interactive(image):
 
         os.system("proxychains4 bash")
     except Exception as err:
-        print err
+        print(err)
         raise
 
 
