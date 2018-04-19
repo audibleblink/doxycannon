@@ -108,6 +108,7 @@ extent where less than 1% of the original code remains.
 ## TODO
 
 - [ ] Allow for management of remote doxycannon installs through the Docker API
+- [ ] Connect to VPN endpoints through TOR when `--up --tor` is passed
 - [X] Interactive mode
 - [X] Python management script
 - [X] Faster Up/Down Container management
