@@ -9,7 +9,7 @@ import docker
 
 try:
     from Queue import Queue  # Python 2
-except NameError:
+except ModuleNotFoundError:
     from queue import Queue  # Python 3
 
 
