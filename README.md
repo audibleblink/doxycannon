@@ -8,6 +8,8 @@ proxy server and binds it to a port on the Docker host. Combined with tools
 like Burp suite or proxychains, this creates your very own private botnet on
 the cheap.
 
+[Password Spraying Blog Post Using DoxyCannon](https://sec.alexflor.es/post/password_spraying_with_doxycannon/)
+
 ## Prerequisites
 - A VPN subscription to a provider that distributes \*.ovpn files
 - Install the required pip modules:
