@@ -47,7 +47,7 @@ While your containers are up, you can use proxychains to issue commands through
 random proxies
 
 ```sh
-proxychains4 -q curl -s ipconfing.io/json
+proxychains4 -q curl -s ipconfig.io/json
 proxychains4 -q hydra -L users.txt -p Winter2018 manager.example.com -t 8 ssh
 proxychains4 -q gobuster -w word.list -h http://manager.example.com
 ```
