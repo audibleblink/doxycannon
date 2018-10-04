@@ -64,7 +64,7 @@ def build(image_name, path='.'):
     """Builds the image with the given name"""
     try:
         doxy.images.build(path=path, tag=image_name)
-        message = '[*] Image {} built.'
+        message = '[+] Image {} built.'
         print(message.format(image_name))
     except Exception as err:
         print(err)
@@ -145,7 +145,7 @@ def down(image_name):
         worker.setDaemon(True)
         worker.start()
     container_queue.join()
-    print('[+] All containers have been issued a kill commaand')
+    print('[+] All containers have been issued a kill command')
 
 
 def multistart(image_name, jobs, ports):
