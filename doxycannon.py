@@ -184,13 +184,13 @@ def start_containers(image_name, ovpn_queue, port_range):
     print('[+] All containers have been issued a start command')
 
 
-def up(image):
+def up(image, conf):
     """Kick off the `up` process that starts all the containers
 
     Writes the configuration files and starts starts container based
     on the number of *.ovpn files in the VPN folder
     """
-    ovpn_file_queue = vpn_file_queue('./VPN')
+    ovpn_file_queue = vpn_file_queue(conf)
     ovpn_file_count = len(list(ovpn_file_queue.queue))
     port_range = range(START_PORT, START_PORT + ovpn_file_count)
     write_haproxy_conf(port_range)
@@ -198,7 +198,7 @@ def up(image):
     start_containers(image, ovpn_file_queue, port_range)
 
 
-def single(image):
+def single(image, conf):
     """Starts an HAProxy rotator.
 
     Builds and starts the HAProxy container in the haproxy folder
@@ -222,7 +222,7 @@ def single(image):
 
     try:
         if not list(containers_from_image(image).queue):
-            up(image)
+            up(image, conf)
         else:
             ovpn_file_count = len(list(vpn_file_queue('VPN').queue))
             port_range = range(START_PORT, START_PORT + ovpn_file_count)
@@ -247,7 +247,7 @@ def interactive(image):
         if not list(containers_from_image(image).queue):
             up(image)
         else:
-            ovpn_file_count = len(list(vpn_file_queue('VPN').queue))
+            ovpn_file_count = len(list(vpn_file_queue(args.dir).queue))
             port_range = range(START_PORT, START_PORT + ovpn_file_count)
             write_proxychains_conf(port_range)
 
@@ -270,7 +270,7 @@ def main():
         action='store_true',
         default=False,
         dest='up',
-        help='Brings up containers. 1 for each VPN file in ./VPN')
+        help='Brings up containers. 1 for each VPN file in [dir]')
     parser.add_argument(
         '--down',
         action='store_true',
@@ -283,6 +283,11 @@ def main():
         default=False,
         dest='single',
         help='Start an HAProxy rotator on a single port. Useful for Burpsuite')
+    parser.add_argument(
+        '--dir',
+        default="VPN",
+        dest='dir',
+        help='Specify a directory to use for VPN config')
     parser.add_argument(
         '--interactive',
         action='store_true',
@@ -299,13 +304,13 @@ def main():
     if args.build:
         build(IMAGE)
     elif args.up:
-        up(IMAGE)
+        up(IMAGE, args.dir)
     elif args.down:
         down(IMAGE)
     elif args.interactive:
         interactive(IMAGE)
     elif args.single:
-        single(IMAGE)
+        single(IMAGE, args.dir)
 
 
 if __name__ == "__main__":

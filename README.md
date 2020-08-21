@@ -31,6 +31,17 @@ the cheap.
   directive in your `./VPN/*.ovpn` files says `auth-user-pass auth.txt`
    - Check out [this wiki section](../../wiki#getting-started-with-vpn-providers)
      for installation instructions for individual VPN providers
+- Within the VPN folder, you may divide/organize your VPN file into subdirectories
+     and use the `--dir` flag with the `--up` or `--single` commands to only use 
+     those configs
+
+     ```sh
+     mkdir -p VPN/HMA/US
+     mv *.opvn auth.txt VPN/HMA/US
+     doxycannon --build
+     doxycannon --dir VPN/HMA/US --single
+     ```
+
 - Run `./doxycannon.py --build` to build your image with your OVPN files
   - `--build` will need to be run on code changes or when you modify the `VPN`
     folder's contents
