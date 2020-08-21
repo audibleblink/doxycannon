@@ -1,8 +1,7 @@
-FROM alpine:3.7
+FROM alpine:3.12
 
 # Install packages
-RUN echo 'http://dl-4.alpinelinux.org/alpine/edge/testing' >> /etc/apk/repositories && \
-	apk --no-cache add openvpn dante-server supervisor && \
+RUN apk --no-cache add openvpn dante-server supervisor && \
 	rm -rf /var/cache/
 
 # Add image configuration and scripts

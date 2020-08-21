@@ -1,19 +1,14 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 import argparse
 import glob
 import os
 import re
 from threading import Thread
+from queue import Queue
 
 import docker
 
-try:
-    from Queue import Queue  # Python 2
-except ModuleNotFoundError:
-    from queue import Queue  # Python 3
-
-
-VERSION = '0.2.0'
+VERSION = '0.3.0'
 IMAGE = 'audibleblink/doxycannon'
 THREADS = 20
 START_PORT = 5000
