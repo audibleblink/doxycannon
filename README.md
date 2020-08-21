@@ -51,7 +51,6 @@ random proxies
 ```sh
 proxychains4 -q curl -s ipconfig.io/json
 proxychains4 -q hydra -L users.txt -p Winter2018 manager.example.com -t 8 ssh
-proxychains4 -q gobuster -w word.list -h http://manager.example.com
 ```
 
 ### GUI Tools
@@ -59,7 +58,6 @@ proxychains4 -q gobuster -w word.list -h http://manager.example.com
 Use the `--single` flag to bring up your proxies and create a proxy rotator.
 
 ```sh
-hgfs/shared/doxycannon  master 
 ❯❯ ./doxycannon.py --single
 [+] Writing HAProxy configuration
 [*] Image doxyproxy built.
@@ -98,8 +96,6 @@ redirected through proxychains4
 ./doxycannon.py --interactive
 ```
 
-## Demo
-[![asciicast](https://asciinema.org/a/YaRyhghHQuBw8Hm3mia5KMewP.png)](https://asciinema.org/a/YaRyhghHQuBw8Hm3mia5KMewP)
 
 ### Credit
 [pry0cc](https://github.com/pry0cc/ProxyDock) for the idea
@@ -107,7 +103,7 @@ redirected through proxychains4
 This was originally a fork of pry0cc's ProxyDock. It's been modified to an
 extent where less than 1% of the original code remains.
 
-## TODO
+## Help Wanted
 
 - [ ] Allow for management of remote doxycannon installs through the Docker API
 - [ ] Connect to VPN endpoints through TOR when `--up --tor` is passed
