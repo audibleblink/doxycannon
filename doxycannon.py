@@ -2,6 +2,7 @@
 import argparse
 import glob
 import os
+import sys
 import re
 from threading import Thread
 from queue import Queue
@@ -52,7 +53,11 @@ listen funnel_proxy
 backend doxycannon
 """
 
-doxy = docker.from_env()
+try: 
+    doxy = docker.from_env()
+except docker.errors.DockerException as err:
+    print("Unable to contact local Docker daemon. Is it running?")
+    sys.exit(1)
 
 
 def build(image_name, path='.'):
