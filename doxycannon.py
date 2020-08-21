@@ -2,6 +2,7 @@
 import argparse
 import glob
 import os
+import sys
 import re
 from threading import Thread
 from queue import Queue
@@ -52,7 +53,11 @@ listen funnel_proxy
 backend doxycannon
 """
 
-doxy = docker.from_env()
+try: 
+    doxy = docker.from_env()
+except docker.errors.DockerException as err:
+    print("Unable to contact local Docker daemon. Is it running?")
+    sys.exit(1)
 
 
 def build(image_name, path='.'):
@@ -107,13 +112,13 @@ def write_proxychains_conf(port_range):
     write_config(PROXYCHAINS_CONF, data, 'proxychains')
 
 
-def containers_from_image(image_name):
+def containers_from_image(image_name, all=False):
     """Returns a Queue of containers whose source image match image_name"""
     jobs = Queue(maxsize=0)
     containers = list(
         filter(
             lambda x: image_name in x.attrs['Config']['Image'],
-            doxy.containers.list()
+            doxy.containers.list(all=all)
         )
     )
     for container in containers:
@@ -129,6 +134,25 @@ def multikill(jobs):
         container.kill(9)
         jobs.task_done()
 
+def delete_container(jobs):
+    """Handler to clean task. Called by the Thread worker function."""
+    while True:
+        container = jobs.get()
+        print('Deleting: {}'.format(container.name))
+        container.remove(force=True)
+        jobs.task_done()
+
+def clean():
+    """Find all containers with 'doxycannon' in the imagename and
+    delete them.
+    """
+    container_queue = containers_from_image(IMAGE, all=True)
+    for _ in range(THREADS):
+        worker = Thread(target=delete_container, args=(container_queue,))
+        worker.setDaemon(True)
+        worker.start()
+    container_queue.join()
+    print('[+] All containers have been issued a kill command')
 
 def down(image_name):
     """Find all containers from an image name and start workers for them.
@@ -150,15 +174,21 @@ def multistart(image_name, jobs, ports):
         ovpn_basename = os.path.basename(jobs.get())
         ovpn_stub = re.sub("\.ovpn", "", ovpn_basename)
         print('Starting: {}'.format(ovpn_stub))
-        doxy.containers.run(
-            image_name,
-            auto_remove=True,
-            privileged=True,
-            ports={'1080/tcp': ('127.0.0.1', port)},
-            dns=['1.1.1.1'],
-            environment=["VPN={}".format(ovpn_stub)],
-            name=ovpn_stub,
-            detach=True)
+        try:
+            doxy.containers.run(
+                image_name,
+                auto_remove=True,
+                privileged=True,
+                ports={'1080/tcp': ('127.0.0.1', port)},
+                dns=['1.1.1.1'],
+                environment=["VPN={}".format(ovpn_stub)],
+                name=ovpn_stub,
+                detach=True)
+        except docker.errors.APIError as err:
+            print(err.explanation)
+            print("[*] Run doxycannon --clean to deletes conflicting containers")
+
+
         port = port + 1
         jobs.task_done()
 
@@ -279,6 +309,12 @@ def main():
         dest='single',
         help='Start an HAProxy rotator on a single port. Useful for Burpsuite')
     parser.add_argument(
+        '--clean',
+        action='store_true',
+        default=False,
+        dest='clean',
+        help='Delete all dangling doxyproxy containers. Usefule for duplicate container errors')
+    parser.add_argument(
         '--dir',
         default="VPN",
         dest='dir',
@@ -306,6 +342,8 @@ def main():
         interactive(IMAGE)
     elif args.single:
         single(IMAGE, args.dir)
+    elif args.clean:
+        clean()
 
 
 if __name__ == "__main__":
