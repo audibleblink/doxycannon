@@ -150,15 +150,19 @@ def multistart(image_name, jobs, ports):
         ovpn_basename = os.path.basename(jobs.get())
         ovpn_stub = re.sub("\.ovpn", "", ovpn_basename)
         print('Starting: {}'.format(ovpn_stub))
-        doxy.containers.run(
-            image_name,
-            auto_remove=True,
-            privileged=True,
-            ports={'1080/tcp': ('127.0.0.1', port)},
-            dns=['1.1.1.1'],
-            environment=["VPN={}".format(ovpn_stub)],
-            name=ovpn_stub,
-            detach=True)
+        try:
+            doxy.containers.run(
+                image_name,
+                auto_remove=True,
+                privileged=True,
+                ports={'1080/tcp': ('127.0.0.1', port)},
+                dns=['1.1.1.1'],
+                environment=["VPN={}".format(ovpn_stub)],
+                name=ovpn_stub,
+                detach=True)
+        except docker.errors.APIError as err:
+            print(err.explanation)
+
         port = port + 1
         jobs.task_done()
 
