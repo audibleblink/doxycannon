@@ -2,23 +2,34 @@
 
 [![CodeFactor](https://www.codefactor.io/repository/github/audibleblink/doxycannon/badge)](https://www.codefactor.io/repository/github/audibleblink/doxycannon)
 
-Doxycannon takes a pool of OpenVPN files and creates a Docker container for
+Doxycannon uses docker to create multiple socks proxies where the upstream
+internet connections are either VPN connections or Tor nodes
+
+In VPN mode, it takes a pool of OpenVPN files and creates a Docker container for
 each one. After a successful VPN connection, each container spawns a SOCKS5
-proxy server and binds it to a port on the Docker host. Combined with tools
-like Burp suite or proxychains, this creates your very own private botnet on
-the cheap.
+proxy server and binds it to a port on the Docker host. 
+
+In Tor mode, multiple containers connecioning to the Tor network are stated and
+can be rotated through, giving you a new egree IP with each request.
+
+Combined with tools like Burp suite or proxychains, this creates your very own (small) private 
+botnet on the cheap.
 
 [Password Spraying Blog Post Using DoxyCannon](https://sec.alexflor.es/post/password_spraying_with_doxycannon/)
 
 ## Prerequisites
-- A VPN subscription to a provider that distributes \*.ovpn files
+- VPN Mode
+  * A VPN subscription to a provider that distributes \*.ovpn files
+
 - Install the required pip modules:
   ```sh
   pip install -r requirements.txt
   ```
+
 - Ensure docker is installed and enabled. Refer to the
   [Wiki](../../wiki/installing-docker) for installation instructions on
   Kali/Debian
+
 - `proxychains4` is required for interactive mode
 
 ## Setup
@@ -38,13 +49,15 @@ the cheap.
      ```sh
      mkdir -p VPN/HMA/US
      mv *.opvn auth.txt VPN/HMA/US
-     doxycannon --build
-     doxycannon --dir VPN/HMA/US --single
+     doxycannon vpn --dir VPN/HMA/US --single
      ```
 
-- Run `./doxycannon.py --build` to build your image with your OVPN files
-  - `--build` will need to be run on code changes or when you modify the `VPN`
-    folder's contents
+- Alternatively, use the `tor` subcommand to just spin up tor nodes
+
+    ```sh
+    doxycannon tor --nodes 7 --up
+    doxycannon tor --single
+    ```
 
 ## Usage
 
@@ -66,10 +79,11 @@ proxychains4 -q hydra -L users.txt -p Winter2018 manager.example.com -t 8 ssh
 
 ### GUI Tools
 
-Use the `--single` flag to bring up your proxies and create a proxy rotator.
+Use the `--single` flag to create a proxy rotator after bringing up your proxies.
 
 ```sh
-❯❯ ./doxycannon.py --single
+❯❯ ./doxycannon.py [vpn|tor] --up
+❯❯ ./doxycannon.py [vpn|tor] --single
 [+] Writing HAProxy configuration
 [*] Image doxyproxy built.
 [*] Staring single-port mode...
