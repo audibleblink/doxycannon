@@ -3,7 +3,7 @@
 import signal
 import sys
 import argparse
-import glob
+from pathlib import Path
 import os
 import sys
 import re
@@ -12,12 +12,13 @@ from queue import Queue
 
 import docker
 
-VERSION = '0.4.0'
+VERSION = '0.4.5'
 IMAGE = 'audibleblink/doxycannon'
 TOR = 'audibleblink/tor'
-DOXY = 'doxyproxy'
+DOXY = 'audibleblink/doxyproxy'
 THREADS = 20
 START_PORT = 9000
+HAPORT = 1337
 
 PROXYCHAINS_CONF = './proxychains.conf'
 PROXYCHAINS_TEMPLATE = """
@@ -50,21 +51,21 @@ defaults
         timeout server 50000ms
 
 listen funnel_proxy
-        bind *:1337
+        bind *:{}
         mode tcp
         balance roundrobin
         default_backend doxycannon
 
 backend doxycannon
-"""
+""".format(HAPORT)
 
 
-def build(image_name, path='.'):
+def build(image, path='.'):
     """Builds the image with the given name"""
     try:
-        doxy.images.build(path=path, tag=image_name)
+        doxy.images.build(path=path, tag=image)
         message = '[+] Image {} built.'
-        print(message.format(image_name))
+        print(message.format(image))
     except Exception as err:
         print(err)
         raise
@@ -72,7 +73,8 @@ def build(image_name, path='.'):
 
 def vpn_file_queue(folder):
     """Returns a Queue of files from the given directory"""
-    files = glob.glob(folder + '/*.ovpn')
+    files = Path(folder).rglob('*.ovpn')
+    # files = glob.glob(folder + '/**/*.ovpn')
     jobs = Queue(maxsize=0)
     for f in files:
         jobs.put(f)
@@ -111,12 +113,12 @@ def write_proxychains_conf(port_range):
     write_config(PROXYCHAINS_CONF, data, 'proxychains')
 
 
-def containers_from_image(image_name, all=False):
-    """Returns a Queue of containers whose source image match image_name"""
+def containers_from_image(image, all=False):
+    """Returns a Queue of containers whose source image match image"""
     jobs = Queue(maxsize=0)
     containers = list(
         filter(
-            lambda x: image_name in x.attrs['Config']['Image'],
+            lambda x: image in x.attrs['Config']['Image'],
             doxy.containers.list(all=all)
         )
     )
@@ -156,45 +158,54 @@ def clean(image):
     print("[+] Deleted all containers based on image {}".format(image))
 
 
-def down(image_name):
+def down(image):
     """Find all containers from an image name and start workers for them.
     The workers are tasked with running the job killer function
     """
-    container_queue = containers_from_image(image_name)
+    container_queue = containers_from_image(image)
     for _ in range(THREADS):
         worker = Thread(target=multikill, args=(container_queue,))
         worker.setDaemon(True)
         worker.start()
     container_queue.join()
-    print("[+] All containers based on {} have been issued a kill command".format(image_name))
+    print("[+] All containers based on {} have been issued a kill command".format(image))
 
 
-def multistart(image_name, jobs, ports):
+def multistart(image, jobs, ports):
     """Handler for starting containers. Called by Thread worker function."""
     while True:
         port = ports.get()
-        basename = os.path.basename(jobs.get())
-        container_name = re.sub("\.ovpn", "", basename)
-        print('Starting: {}'.format(container_name))
+        config = jobs.get()
+        # if config is str, then multistart was called from tor command. Else, config is PosixPath
+        if isinstance(config, str):
+            container_name = config
+            parent = 'tor'
+        else:
+            container_name = re.sub(".ovpn", "", config.name)
+            parent = config.parent
+
+        print('Starting: {} on port {}, path is {}'.format(container_name, port, parent))
+
         try:
             doxy.containers.run(
-                image_name,
+                image,
                 auto_remove=True,
                 privileged=True,
                 ports={'1080/tcp': ('127.0.0.1', port)},
                 dns=['1.1.1.1'],
-                environment=["VPN={}".format(container_name)],
+                environment=["VPN={}".format(container_name), "VPNPATH=/{}".format(parent)],
                 name=container_name,
                 detach=True)
         except docker.errors.APIError as err:
             print(err.explanation)
             print("[*] Run doxycannon --clean to deletes conflicting containers")
 
-        port = port + 1
+        # port = port + 1
+        ports.task_done()
         jobs.task_done()
 
 
-def start_containers(image_name, ovpn_queue, port_range):
+def start_containers(image, ovpn_queue, port_range):
     """Starts workers that call the container creation function"""
     port_queue = Queue(maxsize=0)
     for p in port_range:
@@ -203,7 +214,7 @@ def start_containers(image_name, ovpn_queue, port_range):
     for _ in range(THREADS):
         worker = Thread(
             target=multistart,
-            args=(image_name, ovpn_queue, port_queue,))
+            args=(image, ovpn_queue, port_queue,))
         worker.setDaemon(True)
         worker.start()
     ovpn_queue.join()
@@ -216,8 +227,14 @@ def up(image, conf):
     Writes the configuration files and starts starts container based
     on the number of *.ovpn files in the VPN folder
     """
-    build(IMAGE)
+    if not doxy.images.list(name=image):
+        build(image)
+
     ovpn_file_queue = vpn_file_queue(conf)
+    print("[+] List of VPN files:")
+    for p in list(ovpn_file_queue.queue):
+        print("\t[?]", str(p))
+
     ovpn_file_count = len(list(ovpn_file_queue.queue))
 
     port_range = range(START_PORT, START_PORT + ovpn_file_count)
@@ -232,7 +249,9 @@ def tor(image, count):
     Will take the given number of tor nodes and start a proxy
     rotator that cycles through the tor nodes
     """
-    build(TOR, path='./tor/')
+    if not doxy.images.list(name=image):
+        build(image, path='./tor/')
+
     port_range = range(START_PORT, START_PORT + count)
     name_queue = Queue(maxsize=0)
     for port in port_range:
@@ -240,11 +259,12 @@ def tor(image, count):
     start_containers(image, name_queue, port_range)
 
 
-def rotate(port_range):
+def rotate(image, port_range):
     """Creates a proxy rotator, HAProxy, based on the port range provided"""
     try:
         write_haproxy_conf(port_range)
-        build(DOXY, path='./haproxy')
+        if not doxy.images.list(name=image):
+            build(image, path='./haproxy')
         print('[*] Staring single-port mode...')
         print('[*] Proxy rotator listening on port 1337. Ctrl-c to quit')
         signal.signal(signal.SIGINT, signal_handler)
@@ -266,12 +286,12 @@ def single(image, conf):
     if not list(containers_from_image(image).queue):
         up(image, conf)
 
-    ovpn_file_count = len(list(vpn_file_queue('VPN').queue))
+    ovpn_file_count = len(list(vpn_file_queue(conf).queue))
     port_range = range(START_PORT, START_PORT + ovpn_file_count)
-    rotate(port_range)
+    rotate(DOXY, port_range)
 
 
-def interactive(image):
+def interactive(image, conf):
     """Starts the interactive process. Requires Proxychains4
 
     Creates a shell session where network connections are routed through
@@ -279,13 +299,13 @@ def interactive(image):
     """
     try:
         if not list(containers_from_image(image).queue):
-            up(image)
+            up(image, conf)
         else:
             ovpn_file_count = len(list(vpn_file_queue(args.dir).queue))
             port_range = range(START_PORT, START_PORT + ovpn_file_count)
             write_proxychains_conf(port_range)
 
-        os.system("proxychains4 bash")
+        os.system("proxychains4 zsh")
     except Exception as err:
         print(err)
         raise
@@ -294,7 +314,9 @@ def interactive(image):
 def signal_handler(*args):
     """Traps ctrl+c for cleanup, then exits"""
     sys.stdout = open(os.devnull, 'w')
-    down(DOXY)
+    if list(containers_from_image(DOXY).queue):
+        down(DOXY)
+
     sys.stdout = sys.__stdout__
     print('\n[*] {} was issued a stop command'.format(DOXY))
     print('[*] Your proxies are still running.')
@@ -381,19 +403,19 @@ def get_parsed():
         help="Starts an interactive bash session where network connections" +
         " are routed through proxychains. Requires proxychainvs v4+")
 
-    vpn_group.add_argument(
-        '--paranoia',
+    vpn_cmd.add_argument(
+        '--build',
         action='store_true',
         default=False,
-        dest='paranoia',
-        help="Use tor as the first hop before connection to VPNs")
+        dest='build',
+        help='Build doxyproxy image.')
 
     parser.add_argument(
         '--nuke',
         action='store_true',
         default=False,
         dest='nuke',
-        help='Delete all dangling vpn, tor,  doyxproxy containers.')
+        help='Delete all dangling vpn, tor, doxyproxy containers.')
 
     parser.add_argument(
         '--version',
@@ -410,12 +432,14 @@ def handle_tor(args):
     elif args.down:
         down(TOR)
     elif args.single:
-        rotate(range(START_PORT, START_PORT+args.nodes))
+        rotate(DOXY, range(START_PORT, START_PORT+args.nodes))
 
 
 def handle_vpn(args):
     if args.clean:
         clean(IMAGE)
+    elif args.build:
+        build(IMAGE)
     elif args.up:
         up(IMAGE, args.dir)
     elif args.down:
@@ -423,9 +447,7 @@ def handle_vpn(args):
     elif args.single:
         single(IMAGE, args.dir)
     elif args.interactive:
-        interactive(IMAGE)
-    elif args.paranoia:
-        paranoia(IMAGE)
+        interactive(IMAGE, args.dir)
 
 
 def main(args):
@@ -438,9 +460,9 @@ def main(args):
             clean(i)
             try:
                 doxy.images.remove(i)
+                print("[+] Image {} deleted".format(i))
             except docker.errors.APIError as err:
                 print("[!] {}".format(err.explanation))
-            print("[+] Image {} deleted".format(i))
 
 
 if __name__ == "__main__":
