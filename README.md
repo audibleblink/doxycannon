@@ -49,8 +49,16 @@ botnet on the cheap.
      ```sh
      mkdir -p VPN/HMA/US
      mv *.opvn auth.txt VPN/HMA/US
-     doxycannon vpn --dir VPN/HMA/US --single
+     doxycannon vpn --dir VPN/HMA/US --up
      ```
+
+- If `--dir` is equal to `VPN`, a container will be launched for each VNP file. Use `--single` to have HAproxy load-balance between all VPNs.
+    ```sh
+     doxycannon vpn --dir VPN --up
+     doxycannon vpn --dir VPN --single
+     ```
+
+- `--single` does not stop proxy containers when it quits, it only stops HAproxy. Use `--down` to bring them down.
 
 - Alternatively, use the `tor` subcommand to just spin up tor nodes
 
