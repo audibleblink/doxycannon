@@ -4,7 +4,6 @@ import signal
 import sys
 import argparse
 from pathlib import Path
-# import glob
 import os
 import sys
 import re
@@ -13,10 +12,10 @@ from queue import Queue
 
 import docker
 
-VERSION = '0.5.0'
+VERSION = '0.4.5'
 IMAGE = 'audibleblink/doxycannon'
 TOR = 'audibleblink/tor'
-DOXY = 'doxyproxy'
+DOXY = 'audibleblink/doxyproxy'
 THREADS = 20
 START_PORT = 9000
 
@@ -176,11 +175,12 @@ def multistart(image, jobs, ports):
     while True:
         port = ports.get()
         config = jobs.get()
+        # if config is str, then multistart was called from tor command. Else, config is PosixPath
         if isinstance(config, str):
             container_name = config
             parent = 'tor'
         else:
-            container_name = re.sub("\.ovpn", "", config.name)
+            container_name = re.sub(".ovpn", "", config.name)
             parent = config.parent
 
         print('Starting: {} on port {}, path is {}'.format(container_name, port, parent))
