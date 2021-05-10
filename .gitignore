@@ -1,3 +1,4 @@
+VPN/*
 *.ovpn
 auth.txt
 proxychains.conf
