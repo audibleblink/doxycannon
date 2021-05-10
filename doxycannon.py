@@ -18,6 +18,7 @@ TOR = 'audibleblink/tor'
 DOXY = 'audibleblink/doxyproxy'
 THREADS = 20
 START_PORT = 9000
+HAPORT = 1337
 
 PROXYCHAINS_CONF = './proxychains.conf'
 PROXYCHAINS_TEMPLATE = """
@@ -50,13 +51,13 @@ defaults
         timeout server 50000ms
 
 listen funnel_proxy
-        bind *:1337
+        bind *:{}
         mode tcp
         balance roundrobin
         default_backend doxycannon
 
 backend doxycannon
-"""
+""".format(HAPORT)
 
 
 def build(image, path='.'):
