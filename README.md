@@ -33,13 +33,13 @@ botnet on the cheap.
 - `proxychains4` is required for interactive mode
 
 ## Setup
-- Create an `auth.txt` file with your ovpn credentials in `VPN`. The format is:
+- Create an `NAME.txt` file with your ovpn credentials in `VPN`. The format is:
   ```txt
   username
   password
   ```
 - Fill the VPN folder with `*.ovpn` files and ensure that the `auth-user-pass`
-  directive in your `./VPN/*.ovpn` files says `auth-user-pass auth.txt`
+  directive in your `./VPN/*.ovpn` files says `auth-user-pass NAME.txt`
    - Check out [this wiki section](../../wiki#getting-started-with-vpn-providers)
      for installation instructions for individual VPN providers
 - Within the VPN folder, you may divide/organize your VPN file into subdirectories
@@ -47,10 +47,22 @@ botnet on the cheap.
      those configs
 
      ```sh
-     mkdir -p VPN/HMA/US
-     mv *.opvn auth.txt VPN/HMA/US
-     doxycannon vpn --dir VPN/HMA/US --single
+     mkdir -p VPN/US
+     mv US.opvn auth-us.txt VPN/US
+     doxycannon vpn --dir VPN/US --up
+
+     mkdir -p VPN/FR
+     mv FR.opvn auth-fr.txt VPN/FR
+     doxycannon vpn --dir VPN/FR --up
      ```
+
+- If `--dir` is equal to `VPN`, a container will be launched for each `ovpn` file inside the folder. Use `--single` to have HAproxy load-balance between all VPNs.
+    ```sh
+     doxycannon vpn --dir VPN --up
+     doxycannon vpn --dir VPN --single # Launch HAproxy to load balance
+     ```
+
+- `--single` does not stop proxy containers when it quits, it only stops HAproxy. Use `--down` to bring them down.
 
 - Alternatively, use the `tor` subcommand to just spin up tor nodes
 
