@@ -34,7 +34,11 @@ If using VPN mode, you'll need a VPN subscription to a provider that distributes
 - `proxychains4` is required for interactive mode
 
 ## Setup
+<<<<<<< HEAD
 - Create a `NAME.txt` file with your ovpn credentials in `VPN`. The format is:
+=======
+- Create an `NAME.txt` file with your ovpn credentials in `VPN`. The format is:
+>>>>>>> bbcd56e (fix readme)
   ```txt
   username
   password
@@ -59,6 +63,7 @@ If using VPN mode, you'll need a VPN subscription to a provider that distributes
 
 - If `--dir` is equal to `VPN`, a container will be launched for each `ovpn` file inside the folder. Use `--single` to have HAproxy load-balance between all VPNs.
     ```sh
+     doxycannon vpn --dir VPN --up
      doxycannon vpn --dir VPN --single # Launch HAproxy to load balance
      ```
 
