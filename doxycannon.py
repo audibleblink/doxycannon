@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
 
+import argparse
+import os
+import platform
+import re
 import signal
 import sys
-import argparse
+
 from pathlib import Path
-import os
-import sys
-import re
 from threading import Thread
 from queue import Queue
 
 import docker
 
-VERSION = '0.4.5'
+VERSION = '0.5.0'
 IMAGE = 'audibleblink/doxycannon'
 TOR = 'audibleblink/tor'
 DOXY = 'audibleblink/doxyproxy'
-THREADS = 20
+
+THREADS = 10
 START_PORT = 9000
 HAPORT = 1337
+
+platform = platform.uname()[3].lower()
+IS_DOCKER_VM = "microsoft" in platform or "darwin" in platform 
 
 PROXYCHAINS_CONF = './proxychains.conf'
 PROXYCHAINS_TEMPLATE = """
@@ -100,7 +105,11 @@ def write_config(filename, data, conf_type):
 def write_haproxy_conf(port_range):
     """Generates HAProxy config based on # of ovpn files"""
     print("[+] Writing HAProxy configuration")
-    conf_line = "\tserver doxy{} 127.0.0.1:{} check"
+    if IS_DOCKER_VM:
+        # https://github.com/docker/for-win/issues/6736#issuecomment-630044405
+        conf_line = "\tserver doxy{} host.docker.internal:{} check"
+    else:
+        conf_line = "\tserver doxy{} 127.0.0.1:{} check"
     data = list(map(lambda x: conf_line.format(x, x), port_range))
     write_config(HAPROXY_CONF, data, 'haproxy')
 
@@ -243,32 +252,39 @@ def up(image, conf):
     start_containers(image, ovpn_file_queue, port_range)
 
 
-def tor(image, count):
+def tor(count):
     """Start <count> tor nodes to proxy through
 
     Will take the given number of tor nodes and start a proxy
     rotator that cycles through the tor nodes
     """
-    if not doxy.images.list(name=image):
-        build(image, path='./tor/')
+    if not doxy.images.list(name=TOR):
+        build(TOR, path='./tor/')
 
     port_range = range(START_PORT, START_PORT + count)
     name_queue = Queue(maxsize=0)
     for port in port_range:
         name_queue.put("tor_{}".format(port))
-    start_containers(image, name_queue, port_range)
+    start_containers(TOR, name_queue, port_range)
 
 
-def rotate(image, port_range):
+def rotate(port_range):
     """Creates a proxy rotator, HAProxy, based on the port range provided"""
     try:
         write_haproxy_conf(port_range)
-        if not doxy.images.list(name=image):
-            build(image, path='./haproxy')
+        # if not doxy.images.list(name=DOXY): # Should always build because config is different
+        build(DOXY, path='./haproxy')
+
         print('[*] Staring single-port mode...')
-        print('[*] Proxy rotator listening on port 1337. Ctrl-c to quit')
+        print(f"[*] Proxy rotator listening on port {HAPORT}. Ctrl-c to quit")
         signal.signal(signal.SIGINT, signal_handler)
-        doxy.containers.run(DOXY, network='host', name=DOXY, auto_remove=True)
+        cname = DOXY.split("/")[1]
+
+        if IS_DOCKER_VM:
+            ports = {f"{HAPORT}/tcp": HAPORT}
+            doxy.containers.run(DOXY, name=cname, auto_remove=True, ports=ports)
+        else:
+            doxy.containers.run(DOXY, name=cname, auto_remove=True, network='host')
     except Exception as err:
         print(err)
         raise
@@ -278,7 +294,7 @@ def single(image, conf):
     """Starts an HAProxy rotator.
 
     Builds and starts the HAProxy container in the haproxy folder
-    This will create a local socks5 proxy on port 1337 that will
+    This will create a local socks5 proxy on port $HAPORT that will
     allow one to configure applications with SOCKS proxy options.
     Ex: Firefox, BurpSuite, etc.
     """
@@ -288,7 +304,7 @@ def single(image, conf):
 
     ovpn_file_count = len(list(vpn_file_queue(conf).queue))
     port_range = range(START_PORT, START_PORT + ovpn_file_count)
-    rotate(DOXY, port_range)
+    rotate(port_range)
 
 
 def interactive(image, conf):
@@ -322,6 +338,7 @@ def signal_handler(*args):
     print('[*] Your proxies are still running.')
     sys.exit(0)
 
+
 def get_parsed():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
@@ -352,6 +369,14 @@ def get_parsed():
         default=False,
         dest='single',
         help='Start an HAProxy rotator on a single port. Useful for Burpsuite')
+    
+    tor_cmd.add_argument(
+        '--build',
+        action='store_true',
+        default=False,
+        dest='build',
+        help='Build tor image.')
+
     tor_cmd.add_argument(
         '--clean',
         action='store_true',
@@ -424,15 +449,18 @@ def get_parsed():
 
     return parser.parse_args()
 
+
 def handle_tor(args):
     if args.clean:
         clean(TOR)
+    elif args.build:
+        build(TOR, path="./tor/")
     elif args.up:
-        tor(TOR, args.nodes)
+        tor(args.nodes)
     elif args.down:
         down(TOR)
     elif args.single:
-        rotate(DOXY, range(START_PORT, START_PORT+args.nodes))
+        rotate(range(START_PORT, START_PORT + args.nodes))
 
 
 def handle_vpn(args):
@@ -466,9 +494,9 @@ def main(args):
 
 
 if __name__ == "__main__":
-    try: 
+    try:
         doxy = docker.from_env()
-    except Exception as err:
+    except Exception:
         print("Unable to contact local Docker daemon. Is it running?")
         sys.exit(1)
     args = get_parsed()
