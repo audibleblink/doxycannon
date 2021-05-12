@@ -5,7 +5,6 @@ import sys
 import argparse
 from pathlib import Path
 import os
-import sys
 import re
 from threading import Thread
 from queue import Queue
