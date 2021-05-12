@@ -174,8 +174,7 @@ def down(image):
     container_queue.join()
 
     try:
-        network = doxy.networks.get("doxy_network")
-        network.remove()
+        doxy.networks.get("doxy_network").remove()
     except:
         print("[?] Network won't be removed as containers are still running.")
 
@@ -241,7 +240,11 @@ def up(image, conf):
     on the number of *.ovpn files in the VPN folder
     """
 
-    doxy.networks.create("doxy_network", driver="bridge", attachable=True)
+    try:
+        doxy.networks.get("doxy_network")
+        print("[?] Network already exists")
+    except docker.errors.NotFound:
+        doxy.networks.create("doxy_network", driver="bridge", attachable=True)
 
     if not doxy.images.list(name=image):
         build(image)
@@ -270,7 +273,11 @@ def tor(count):
     if not doxy.images.list(name=TOR):
         build(TOR, path='./tor/')
 
-    doxy.networks.create("doxy_network", driver="bridge", attachable=True)
+    try:
+        doxy.networks.get("doxy_network")
+        print("[?] Network already exists")
+    except docker.errors.NotFound:
+        doxy.networks.create("doxy_network", driver="bridge", attachable=True)
 
     port_range = range(START_PORT, START_PORT + count)
     name_queue = Queue(maxsize=0)
