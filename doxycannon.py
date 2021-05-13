@@ -2,7 +2,6 @@
 
 import argparse
 import os
-import platform
 import re
 import signal
 import sys
@@ -21,9 +20,6 @@ DOXY = 'audibleblink/doxyproxy'
 THREADS = 10
 START_PORT = 9000
 HAPORT = 1337
-
-platform = platform.uname()[3].lower()
-IS_DOCKER_VM = "microsoft" in platform or "darwin" in platform 
 
 PROXYCHAINS_CONF = './proxychains.conf'
 PROXYCHAINS_TEMPLATE = """
@@ -68,7 +64,7 @@ backend doxycannon
 def build(image, path='.'):
     """Builds the image with the given name"""
     try:
-        doxy.images.build(path=path, tag=image)
+        doxy.images.build(path=path, tag=image, forcerm=True)
         message = '[+] Image {} built.'
         print(message.format(image))
     except Exception as err:
@@ -102,15 +98,14 @@ def write_config(filename, data, conf_type):
             f.write(line + "\n")
 
 
-def write_haproxy_conf(port_range):
+def write_haproxy_conf(names, port_range):
     """Generates HAProxy config based on # of ovpn files"""
     print("[+] Writing HAProxy configuration")
-    if IS_DOCKER_VM:
-        # https://github.com/docker/for-win/issues/6736#issuecomment-630044405
-        conf_line = "\tserver doxy{} host.docker.internal:{} check"
-    else:
-        conf_line = "\tserver doxy{} 127.0.0.1:{} check"
-    data = list(map(lambda x: conf_line.format(x, x), port_range))
+
+    conf_line = "\tserver doxy{0} {1}:1080 check"
+
+    data = list(map(lambda x: conf_line.format(x[0], x[1]), zip(port_range, names)))
+
     write_config(HAPROXY_CONF, data, 'haproxy')
 
 
@@ -177,6 +172,12 @@ def down(image):
         worker.setDaemon(True)
         worker.start()
     container_queue.join()
+
+    try:
+        doxy.networks.get("doxy_network").remove()
+    except:
+        print("[?] Network won't be removed as containers are still running.")
+
     print("[+] All containers based on {} have been issued a kill command".format(image))
 
 
@@ -201,7 +202,7 @@ def multistart(image, jobs, ports):
                 auto_remove=True,
                 privileged=True,
                 ports={'1080/tcp': ('127.0.0.1', port)},
-                dns=['1.1.1.1'],
+                network='doxy_network',
                 environment=["VPN={}".format(container_name), "VPNPATH=/{}".format(parent)],
                 name=container_name,
                 detach=True)
@@ -236,6 +237,13 @@ def up(image, conf):
     Writes the configuration files and starts starts container based
     on the number of *.ovpn files in the VPN folder
     """
+
+    try:
+        doxy.networks.get("doxy_network")
+        print("[?] Network already exists")
+    except docker.errors.NotFound:
+        doxy.networks.create("doxy_network", driver="bridge", attachable=True)
+
     if not doxy.images.list(name=image):
         build(image)
 
@@ -246,8 +254,10 @@ def up(image, conf):
 
     ovpn_file_count = len(list(ovpn_file_queue.queue))
 
+    names = [re.sub(".ovpn", "", name.name) for name in ovpn_file_queue.queue]
+
     port_range = range(START_PORT, START_PORT + ovpn_file_count)
-    write_haproxy_conf(port_range)
+    write_haproxy_conf(names, port_range)
     write_proxychains_conf(port_range)
     start_containers(image, ovpn_file_queue, port_range)
 
@@ -261,33 +271,40 @@ def tor(count):
     if not doxy.images.list(name=TOR):
         build(TOR, path='./tor/')
 
+    try:
+        doxy.networks.get("doxy_network")
+        print("[?] Network already exists")
+    except docker.errors.NotFound:
+        doxy.networks.create("doxy_network", driver="bridge", attachable=True)
+
     port_range = range(START_PORT, START_PORT + count)
     name_queue = Queue(maxsize=0)
+    names = []
     for port in port_range:
         name_queue.put("tor_{}".format(port))
+        names.append(f"tor_{port}")
+
+    write_haproxy_conf(names, port_range)
     start_containers(TOR, name_queue, port_range)
 
 
-def rotate(port_range):
+def rotate():
     """Creates a proxy rotator, HAProxy, based on the port range provided"""
     try:
-        write_haproxy_conf(port_range)
         build(DOXY, path='./haproxy')
         print('[*] Staring single-port mode...')
         print(f"[*] Proxy rotator listening on port {HAPORT}. Ctrl-c to quit")
         signal.signal(signal.SIGINT, signal_handler)
         cname = DOXY.split("/")[1]
-        if IS_DOCKER_VM:
-            ports = {f"{HAPORT}/tcp": HAPORT}
-            doxy.containers.run(DOXY, name=cname, auto_remove=True, ports=ports)
-        else:
-            doxy.containers.run(DOXY, name=cname, auto_remove=True, network='host')
+
+        doxy.containers.run(DOXY, name=cname, auto_remove=True, network='doxy_network', ports={f"{HAPORT}/tcp": ('127.0.0.1', HAPORT)})
+
     except Exception as err:
         print(err)
         raise
 
 
-def single(image, conf):
+def single(image, conf=None, nodes=None):
     """Starts an HAProxy rotator.
 
     Builds and starts the HAProxy container in the haproxy folder
@@ -297,11 +314,12 @@ def single(image, conf):
     """
 
     if not list(containers_from_image(image).queue):
-        up(image, conf)
+        if nodes:
+            tor(args.nodes)
+        elif conf:
+            up(image, conf)
 
-    ovpn_file_count = len(list(vpn_file_queue(conf).queue))
-    port_range = range(START_PORT, START_PORT + ovpn_file_count)
-    rotate(port_range)
+    rotate()
 
 
 def interactive(image, conf):
@@ -447,7 +465,7 @@ def handle_tor(args):
     elif args.down:
         down(TOR)
     elif args.single:
-        rotate(range(START_PORT, START_PORT + args.nodes))
+        single(TOR, nodes=args.nodes)
 
 
 def handle_vpn(args):
@@ -460,7 +478,7 @@ def handle_vpn(args):
     elif args.down:
         down(IMAGE)
     elif args.single:
-        single(IMAGE, args.dir)
+        single(IMAGE, conf=args.dir)
     elif args.interactive:
         interactive(IMAGE, args.dir)
 
@@ -474,6 +492,8 @@ def main(args):
         for i in [IMAGE, TOR, DOXY]:
             clean(i)
             try:
+                network = doxy.networks.get("doxy_network")
+                network.remove()
                 doxy.images.remove(i)
                 print("[+] Image {} deleted".format(i))
             except docker.errors.APIError as err:
@@ -488,3 +508,4 @@ if __name__ == "__main__":
         sys.exit(1)
     args = get_parsed()
     main(args)
+
