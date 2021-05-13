@@ -12,7 +12,7 @@ from queue import Queue
 
 import docker
 
-VERSION = '0.5.0'
+VERSION = '0.5.1'
 IMAGE = 'audibleblink/doxycannon'
 TOR = 'audibleblink/tor'
 DOXY = 'audibleblink/doxyproxy'
@@ -135,7 +135,7 @@ def multikill(jobs):
     """Handler to job killer. Called by the Thread worker function."""
     while True:
         container = jobs.get()
-        print('Stopping: {}'.format(container.name))
+        print(f"Stopping: {container.name}")
         container.kill(9)
         jobs.task_done()
 
@@ -144,7 +144,7 @@ def delete_container(jobs):
     """Handler to clean task. Called by the Thread worker function."""
     while True:
         container = jobs.get()
-        print('Deleting: {}'.format(container.name))
+        print(f"Deleting: {container.name}")
         container.remove(force=True)
         jobs.task_done()
 
@@ -159,7 +159,7 @@ def clean(image):
         worker.setDaemon(True)
         worker.start()
     container_queue.join()
-    print("[+] Deleted all containers based on image {}".format(image))
+    print(f"[+] Delete request sent to daemon for all containers based on image {image}")
 
 
 def down(image):
@@ -175,10 +175,10 @@ def down(image):
 
     try:
         doxy.networks.get("doxy_network").remove()
-    except:
-        print("[?] Network won't be removed as containers are still running.")
+    except Exception as err:
+        print(f"[?] Network won't be removed as containers are still running.\n{err}")
 
-    print("[+] All containers based on {} have been issued a kill command".format(image))
+    print(f"[+] All containers based on {image} have been issued a kill command")
 
 
 def multistart(image, jobs, ports):
@@ -194,7 +194,7 @@ def multistart(image, jobs, ports):
             container_name = re.sub(".ovpn", "", config.name)
             parent = config.parent
 
-        print('Starting: {} on port {}, path is {}'.format(container_name, port, parent))
+        print(f"Starting: {container_name} on port {port}, path is {parent}")
 
         try:
             # pass
@@ -203,9 +203,8 @@ def multistart(image, jobs, ports):
                 auto_remove=True,
                 privileged=True,
                 ports={'1080/tcp': ('127.0.0.1', port)},
-                # dns=['1.1.1.1'],
                 network='doxy_network',
-                environment=["VPN={}".format(container_name), "VPNPATH=/{}".format(parent)],
+                environment=[f"VPN={container_name}", f"VPNPATH=/{parent}"],
                 name=container_name,
                 detach=True)
         except docker.errors.APIError as err:
@@ -256,7 +255,7 @@ def up(image, conf):
 
     ovpn_file_count = len(list(ovpn_file_queue.queue))
 
-    names = [re.sub(".ovpn", "", name.name) for name in ovpn_file_queue.queue] 
+    names = [re.sub(".ovpn", "", name.name) for name in ovpn_file_queue.queue]
 
     port_range = range(START_PORT, START_PORT + ovpn_file_count)
     write_haproxy_conf(names, port_range)
@@ -283,8 +282,8 @@ def tor(count):
     name_queue = Queue(maxsize=0)
     names = []
     for port in port_range:
-        name_queue.put("tor_{}".format(port))
-        names.append("tor_{}".format(port))
+        name_queue.put(f"tor_{port}")
+        names.append(f"tor_{port}")
 
     write_haproxy_conf(names, port_range)
     start_containers(TOR, name_queue, port_range)
@@ -321,7 +320,6 @@ def single(image, conf=None, nodes=None):
             tor(args.nodes)
         elif conf:
             up(image, conf)
-    
     rotate()
 
 
@@ -352,7 +350,7 @@ def signal_handler(*args):
         down(DOXY)
 
     sys.stdout = sys.__stdout__
-    print('\n[*] {} was issued a stop command'.format(DOXY))
+    print(f"\n[*] {DOXY} was issued a stop command")
     print('[*] Your proxies are still running.')
     sys.exit(0)
 
@@ -463,7 +461,7 @@ def get_parsed():
     parser.add_argument(
         '--version',
         action='version',
-        version="%(prog)s {}".format(VERSION))
+        version="%(prog)s {VERSION}")
 
     return parser.parse_args()
 
@@ -508,9 +506,12 @@ def main(args):
                 network = doxy.networks.get("doxy_network")
                 network.remove()
                 doxy.images.remove(i)
-                print("[+] Image {} deleted".format(i))
+                network = doxy.networks.get("doxy_network")
+                if network:
+                    network.remove()
+                print(f"[+] Image {i} deleted")
             except docker.errors.APIError as err:
-                print("[!] {}".format(err.explanation))
+                print(f"[!] {err.explanation}")
 
 
 if __name__ == "__main__":
