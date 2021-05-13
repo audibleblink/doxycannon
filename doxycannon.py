@@ -12,7 +12,7 @@ from queue import Queue
 
 import docker
 
-VERSION = '0.5.0'
+VERSION = '0.5.1'
 IMAGE = 'audibleblink/doxycannon'
 TOR = 'audibleblink/tor'
 DOXY = 'audibleblink/doxyproxy'
