@@ -175,8 +175,8 @@ def down(image):
 
     try:
         doxy.networks.get("doxy_network").remove()
-    except:
-        print("[?] Network won't be removed as containers are still running.")
+    except Exception as err:
+        print(f"[?] Network won't be removed as containers are still running.\n{err}")
 
     print("[+] All containers based on {} have been issued a kill command".format(image))
 
@@ -492,10 +492,12 @@ def main(args):
         for i in [IMAGE, TOR, DOXY]:
             clean(i)
             try:
-                network = doxy.networks.get("doxy_network")
-                network.remove()
                 doxy.images.remove(i)
-                print("[+] Image {} deleted".format(i))
+                network = doxy.networks.get("doxy_network")
+                if network:
+                    network.remove()
+                    print(f"[+] 'doxy_network' deleted")
+                print(f"[+] Image {i} deleted")
             except docker.errors.APIError as err:
                 print("[!] {}".format(err.explanation))
 
