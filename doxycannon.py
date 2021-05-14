@@ -16,6 +16,7 @@ VERSION = '0.5.1'
 IMAGE = 'audibleblink/doxycannon'
 TOR = 'audibleblink/tor'
 DOXY = 'audibleblink/doxyproxy'
+NET = 'doxy_network'
 
 THREADS = 10
 START_PORT = 9000
@@ -173,7 +174,7 @@ def down(image):
     container_queue.join()
 
     try:
-        doxy.networks.get("doxy_network").remove()
+        doxy.networks.get(NET).remove()
     except Exception as err:
         print(f"[?] Network won't be removed as containers are still running.\n{err}")
 
@@ -202,7 +203,7 @@ def multistart(image, jobs, ports):
                 auto_remove=True,
                 privileged=True,
                 ports={'1080/tcp': ('127.0.0.1', port)},
-                network='doxy_network',
+                network=NET,
                 environment=[f"VPN={container_name}", f"VPNPATH=/{parent}"],
                 name=container_name,
                 detach=True)
@@ -239,10 +240,10 @@ def up(image, conf):
     """
 
     try:
-        doxy.networks.get("doxy_network")
+        doxy.networks.get(NET)
         print("[?] Network already exists")
     except docker.errors.NotFound:
-        doxy.networks.create("doxy_network", driver="bridge", attachable=True)
+        doxy.networks.create(NET, driver="bridge", attachable=True)
 
     if not doxy.images.list(name=image):
         build(image)
@@ -272,10 +273,10 @@ def tor(count):
         build(TOR, path='./tor/')
 
     try:
-        doxy.networks.get("doxy_network")
+        doxy.networks.get(NET)
         print("[?] Network already exists")
     except docker.errors.NotFound:
-        doxy.networks.create("doxy_network", driver="bridge", attachable=True)
+        doxy.networks.create(NET, driver="bridge", attachable=True)
 
     port_range = range(START_PORT, START_PORT + count)
     name_queue = Queue(maxsize=0)
@@ -298,7 +299,7 @@ def rotate():
         signal.signal(signal.SIGINT, signal_handler)
         cname = DOXY.split("/")[1]
 
-        doxy.containers.run(DOXY, name=cname, auto_remove=True, network='doxy_network', ports={'1337/tcp': ('127.0.0.1', HAPORT)})
+        doxy.containers.run(DOXY, name=cname, auto_remove=True, network=NET, ports={'1337/tcp': ('127.0.0.1', HAPORT)})
 
     except Exception as err:
         print(err)
@@ -499,15 +500,16 @@ def main(args):
     elif args.command == "vpn":
         handle_vpn(args)
     elif args.nuke:
+        try:
+            network = doxy.networks.get(NET)
+            network.remove()
+        except docker.errors.APIError as err:
+                print(f"[+] {err.explanation}")
+
         for i in [IMAGE, TOR, DOXY]:
             clean(i)
             try:
-                network = doxy.networks.get("doxy_network")
-                network.remove()
                 doxy.images.remove(i)
-                network = doxy.networks.get("doxy_network")
-                if network:
-                    network.remove()
                 print(f"[+] Image {i} deleted")
             except docker.errors.APIError as err:
                 print(f"[!] {err.explanation}")
