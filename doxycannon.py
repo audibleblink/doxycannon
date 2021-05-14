@@ -337,7 +337,7 @@ def interactive(image, conf):
             port_range = range(START_PORT, START_PORT + ovpn_file_count)
             write_proxychains_conf(port_range)
 
-        os.system("proxychains4 zsh")
+        os.system("proxychains4 bash")
     except Exception as err:
         print(err)
         raise
