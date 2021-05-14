@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine:3
 
 # Install packages
 RUN apk --no-cache add openvpn dante-server supervisor && \

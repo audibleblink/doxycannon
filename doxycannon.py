@@ -117,13 +117,13 @@ def write_proxychains_conf(port_range):
     write_config(PROXYCHAINS_CONF, data, 'proxychains')
 
 
-def containers_from_image(image, all=False):
+def containers_from_image(image, list_all=False):
     """Returns a Queue of containers whose source image match image"""
     jobs = Queue(maxsize=0)
     containers = list(
         filter(
             lambda x: image in x.attrs['Config']['Image'],
-            doxy.containers.list(all=all)
+            doxy.containers.list(all=list_all)
         )
     )
     for container in containers:
@@ -153,7 +153,7 @@ def clean(image):
     """Find all containers with <image> in the imagename and
     delete them.
     """
-    container_queue = containers_from_image(image, all=True)
+    container_queue = containers_from_image(image, list_all=True)
     for _ in range(THREADS):
         worker = Thread(target=delete_container, args=(container_queue,))
         worker.setDaemon(True)
