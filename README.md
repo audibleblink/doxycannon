@@ -71,12 +71,10 @@ If using VPN mode, you'll need a VPN subscription to a provider that distributes
     ```
 
 ## Usage
+_note_: Before 14 May 21, versions of [rofl0r/proxychains-ng](https://github.com/rofl0r/proxychains-ng) use a 
+second-based seed for the PRNG that determines random proxy selection. Be sure to use a version based on or 
+after this [commit](https://github.com/rofl0r/proxychains-ng/commit/092d7042e092a033ac0c33a238927050c2cc7de0)
 
-_note_: proxychains' prng uses an epoch time-based seed which means you may get multiple requests
-being made from the same IP if less than a second passes between requests. If this is unacceptable,
-I have a patch for [rofl0r/proxychains-ng](https://github.com/rofl0r/proxychains-ng) on my fork,
-`prng` branch located
-[here](https://github.com/audibleblink/proxychains-ng/commit/c55920fca1fa1b9218eb9e321072331bfbd5403b.patch)
 
 ### One-off, random commands
 While your containers are up, you can use proxychains-ng to issue commands through
