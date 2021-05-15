@@ -16,6 +16,7 @@ VERSION = '0.5.1'
 IMAGE = 'audibleblink/doxycannon'
 TOR = 'audibleblink/tor'
 DOXY = 'audibleblink/doxyproxy'
+NET = 'doxy_network'
 
 THREADS = 10
 START_PORT = 9000
@@ -64,9 +65,8 @@ backend doxycannon
 def build(image, path='.'):
     """Builds the image with the given name"""
     try:
+        print(f"[+] Building image: {image}.")
         doxy.images.build(path=path, tag=image, forcerm=True)
-        message = '[+] Image {} built.'
-        print(message.format(image))
     except Exception as err:
         print(err)
         raise
@@ -117,13 +117,13 @@ def write_proxychains_conf(port_range):
     write_config(PROXYCHAINS_CONF, data, 'proxychains')
 
 
-def containers_from_image(image, all=False):
+def containers_from_image(image, list_all=False):
     """Returns a Queue of containers whose source image match image"""
     jobs = Queue(maxsize=0)
     containers = list(
         filter(
             lambda x: image in x.attrs['Config']['Image'],
-            doxy.containers.list(all=all)
+            doxy.containers.list(all=list_all)
         )
     )
     for container in containers:
@@ -153,7 +153,7 @@ def clean(image):
     """Find all containers with <image> in the imagename and
     delete them.
     """
-    container_queue = containers_from_image(image, all=True)
+    container_queue = containers_from_image(image, list_all=True)
     for _ in range(THREADS):
         worker = Thread(target=delete_container, args=(container_queue,))
         worker.setDaemon(True)
@@ -174,7 +174,7 @@ def down(image):
     container_queue.join()
 
     try:
-        doxy.networks.get("doxy_network").remove()
+        doxy.networks.get(NET).remove()
     except Exception as err:
         print(f"[?] Network won't be removed as containers are still running.\n{err}")
 
@@ -203,7 +203,7 @@ def multistart(image, jobs, ports):
                 auto_remove=True,
                 privileged=True,
                 ports={'1080/tcp': ('127.0.0.1', port)},
-                network='doxy_network',
+                network=NET,
                 environment=[f"VPN={container_name}", f"VPNPATH=/{parent}"],
                 name=container_name,
                 detach=True)
@@ -240,10 +240,10 @@ def up(image, conf):
     """
 
     try:
-        doxy.networks.get("doxy_network")
+        doxy.networks.get(NET)
         print("[?] Network already exists")
     except docker.errors.NotFound:
-        doxy.networks.create("doxy_network", driver="bridge", attachable=True)
+        doxy.networks.create(NET, driver="bridge", attachable=True)
 
     if not doxy.images.list(name=image):
         build(image)
@@ -273,10 +273,10 @@ def tor(count):
         build(TOR, path='./tor/')
 
     try:
-        doxy.networks.get("doxy_network")
+        doxy.networks.get(NET)
         print("[?] Network already exists")
     except docker.errors.NotFound:
-        doxy.networks.create("doxy_network", driver="bridge", attachable=True)
+        doxy.networks.create(NET, driver="bridge", attachable=True)
 
     port_range = range(START_PORT, START_PORT + count)
     name_queue = Queue(maxsize=0)
@@ -299,7 +299,7 @@ def rotate():
         signal.signal(signal.SIGINT, signal_handler)
         cname = DOXY.split("/")[1]
 
-        doxy.containers.run(DOXY, name=cname, auto_remove=True, network='doxy_network', ports={'1337/tcp': ('127.0.0.1', HAPORT)})
+        doxy.containers.run(DOXY, name=cname, auto_remove=True, network=NET, ports={'1337/tcp': ('127.0.0.1', HAPORT)})
 
     except Exception as err:
         print(err)
@@ -337,7 +337,7 @@ def interactive(image, conf):
             port_range = range(START_PORT, START_PORT + ovpn_file_count)
             write_proxychains_conf(port_range)
 
-        os.system("proxychains4 zsh")
+        os.system("proxychains4 bash")
     except Exception as err:
         print(err)
         raise
@@ -500,15 +500,18 @@ def main(args):
     elif args.command == "vpn":
         handle_vpn(args)
     elif args.nuke:
+        try:
+            network = doxy.networks.get(NET)
+            network.remove()
+        except docker.errors.APIError as err:
+                print(f"[+] {err.explanation}")
+
         for i in [IMAGE, TOR, DOXY]:
             clean(i)
             try:
                 network = doxy.networks.get("doxy_network")
                 network.remove()
                 doxy.images.remove(i)
-                network = doxy.networks.get("doxy_network")
-                if network:
-                    network.remove()
                 print(f"[+] Image {i} deleted")
             except docker.errors.APIError as err:
                 print(f"[!] {err.explanation}")
