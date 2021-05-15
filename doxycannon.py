@@ -509,7 +509,7 @@ def main(args):
         for i in [IMAGE, TOR, DOXY]:
             clean(i)
             try:
-                network = doxy.networks.get("doxy_network")
+                network = doxy.networks.get(NET)
                 network.remove()
                 doxy.images.remove(i)
                 print(f"[+] Image {i} deleted")
