@@ -148,7 +148,7 @@ def multikill(jobs, to_filter):
     while True:
         container = jobs.get()
         if to_filter:
-            if container.name not in to_filter:
+            if container.name in to_filter:
                 print(f"Stopping: {container.name}")
                 container.kill(9)
         else:
