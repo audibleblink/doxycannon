@@ -232,7 +232,7 @@ def start_containers(image, ovpn_queue, port_range):
     print('[+] All containers have been issued a start command')
 
 
-def up(image, conf):
+def up(image, conf, port):
     """Kick off the `up` process that starts all the containers
 
     Writes the configuration files and starts starts container based
@@ -257,7 +257,10 @@ def up(image, conf):
 
     names = [re.sub(".ovpn", "", name.name) for name in ovpn_file_queue.queue]
 
-    port_range = range(START_PORT, START_PORT + ovpn_file_count)
+    if port:
+        port_range = range(port, port + ovpn_file_count)
+    else:
+        port_range = range(START_PORT, START_PORT + ovpn_file_count)
     write_haproxy_conf(names, port_range)
     write_proxychains_conf(port_range)
     start_containers(image, ovpn_file_queue, port_range)
@@ -401,6 +404,15 @@ def get_parsed():
         help='Delete all dangling tor containers. Useful for duplicate container errors')
 
     vpn_cmd = subparsers.add_parser('vpn', help="vpn --help")
+
+    vpn_cmd.add_argument(
+        "-p", "--port",
+        action="store",
+        type=int,
+        dest="port",
+        default=None,
+        required=False)
+
     vpn_group = vpn_cmd.add_mutually_exclusive_group()
     vpn_group.add_argument(
         '--up',
@@ -485,7 +497,7 @@ def handle_vpn(args):
     elif args.build:
         build(IMAGE)
     elif args.up:
-        up(IMAGE, args.dir)
+        up(IMAGE, args.dir, args.port)
     elif args.down:
         down(IMAGE)
     elif args.single:
