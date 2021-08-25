@@ -71,6 +71,10 @@ def build(image, path='.'):
         print(err)
         raise
 
+def vpn_file_list(folder):
+    files = Path(folder).rglob('*.ovpn')
+
+    return [re.sub(".ovpn", "", c.name) for c in files]
 
 def vpn_file_queue(folder):
     """Returns a Queue of files from the given directory"""
@@ -131,12 +135,25 @@ def containers_from_image(image, list_all=False):
     return jobs
 
 
-def multikill(jobs):
+def running_containers(image):
+    return [c.name for c in list(
+        filter(
+            lambda x: image in x.attrs['Config']['Image'],
+            doxy.containers.list(all=False)
+        )
+    )]
+
+def multikill(jobs, to_filter):
     """Handler to job killer. Called by the Thread worker function."""
     while True:
         container = jobs.get()
-        print(f"Stopping: {container.name}")
-        container.kill(9)
+        if to_filter:
+            if container.name in to_filter:
+                print(f"Stopping: {container.name}")
+                container.kill(9)
+        else:
+            print(f"Stopping: {container.name}")
+            container.kill(9)
         jobs.task_done()
 
 
@@ -162,26 +179,32 @@ def clean(image):
     print(f"[+] Delete request sent to daemon for all containers based on image {image}")
 
 
-def down(image):
+def down(image, conf):
     """Find all containers from an image name and start workers for them.
     The workers are tasked with running the job killer function
     """
     container_queue = containers_from_image(image)
+
+    if conf:
+        to_filter = vpn_file_list(conf)
+    else:
+        to_filter = None
+
     for _ in range(THREADS):
-        worker = Thread(target=multikill, args=(container_queue,))
+        worker = Thread(target=multikill, args=(container_queue,to_filter))
         worker.setDaemon(True)
         worker.start()
     container_queue.join()
 
     try:
         doxy.networks.get(NET).remove()
-    except Exception as err:
-        print(f"[?] Network won't be removed as containers are still running.\n{err}")
+    except:
+        print(f"[?] Cannot remove network, either it has already been removed or containers are still running")
 
     print(f"[+] All containers based on {image} have been issued a kill command")
 
 
-def multistart(image, jobs, ports):
+def multistart(image, jobs, ports, running_container_list):
     """Handler for starting containers. Called by Thread worker function."""
     while True:
         port = ports.get()
@@ -194,10 +217,15 @@ def multistart(image, jobs, ports):
             container_name = re.sub(".ovpn", "", config.name)
             parent = config.parent
 
-        print(f"Starting: {container_name} on port {port}, path is {parent}")
+        if container_name in running_container_list:
+            print(f"Already running: {container_name}, path is {parent}")
+            ports.task_done()
+            jobs.task_done()
+            return
+        else:
+            print(f"Starting: {container_name} on port {port}, path is {parent}")
 
         try:
-            # pass
             doxy.containers.run(
                 image,
                 auto_remove=True,
@@ -208,15 +236,14 @@ def multistart(image, jobs, ports):
                 name=container_name,
                 detach=True)
         except docker.errors.APIError as err:
-            print(err.explanation)
-            print("[*] Run doxycannon --clean to deletes conflicting containers")
+            print(f"[!] Failed to start {container_name}: {err.explanation}")
 
         # port = port + 1
         ports.task_done()
         jobs.task_done()
 
 
-def start_containers(image, ovpn_queue, port_range):
+def start_containers(image, ovpn_queue, port_range, running_container_list):
     """Starts workers that call the container creation function"""
     port_queue = Queue(maxsize=0)
     for p in port_range:
@@ -225,14 +252,14 @@ def start_containers(image, ovpn_queue, port_range):
     for _ in range(THREADS):
         worker = Thread(
             target=multistart,
-            args=(image, ovpn_queue, port_queue,))
+            args=(image, ovpn_queue, port_queue,running_container_list,))
         worker.setDaemon(True)
         worker.start()
     ovpn_queue.join()
     print('[+] All containers have been issued a start command')
 
 
-def up(image, conf):
+def up(image, conf, port):
     """Kick off the `up` process that starts all the containers
 
     Writes the configuration files and starts starts container based
@@ -255,12 +282,23 @@ def up(image, conf):
 
     ovpn_file_count = len(list(ovpn_file_queue.queue))
 
+    running_container_list = running_containers(image)
+    nb_running = len(running_container_list)
+
     names = [re.sub(".ovpn", "", name.name) for name in ovpn_file_queue.queue]
 
-    port_range = range(START_PORT, START_PORT + ovpn_file_count)
-    write_haproxy_conf(names, port_range)
-    write_proxychains_conf(port_range)
-    start_containers(image, ovpn_file_queue, port_range)
+    if port:
+        port_range = range(port, port + ovpn_file_count)
+        port_range2 = range(port + nb_running, port + ovpn_file_count + nb_running)
+    else:
+        port_range = range(START_PORT + nb_running, START_PORT + ovpn_file_count + nb_running)
+        port_range2 = range(START_PORT, START_PORT + ovpn_file_count + nb_running)
+
+    # port_range2 is without already running containers
+    write_haproxy_conf(names, port_range2)
+    write_proxychains_conf(port_range2)
+
+    start_containers(image, ovpn_file_queue, port_range, running_container_list)
 
 
 def tor(count):
@@ -278,7 +316,10 @@ def tor(count):
     except docker.errors.NotFound:
         doxy.networks.create(NET, driver="bridge", attachable=True)
 
-    port_range = range(START_PORT, START_PORT + count)
+    running_container_list = running_containers(TOR)
+    nb_running = len(running_container_list)
+
+    port_range = range(START_PORT + nb_running, START_PORT + count + nb_running)
     name_queue = Queue(maxsize=0)
     names = []
     for port in port_range:
@@ -286,7 +327,7 @@ def tor(count):
         names.append(f"tor_{port}")
 
     write_haproxy_conf(names, port_range)
-    start_containers(TOR, name_queue, port_range)
+    start_containers(TOR, name_queue, port_range, running_container_list)
 
 
 def rotate():
@@ -347,7 +388,7 @@ def signal_handler(*args):
     """Traps ctrl+c for cleanup, then exits"""
     sys.stdout = open(os.devnull, 'w')
     if list(containers_from_image(DOXY).queue):
-        down(DOXY)
+        down(DOXY, None)
 
     sys.stdout = sys.__stdout__
     print(f"\n[*] {DOXY} was issued a stop command")
@@ -401,6 +442,16 @@ def get_parsed():
         help='Delete all dangling tor containers. Useful for duplicate container errors')
 
     vpn_cmd = subparsers.add_parser('vpn', help="vpn --help")
+
+    vpn_cmd.add_argument(
+        "--port",
+        action="store",
+        type=int,
+        dest="port",
+        default=None,
+        required=False,
+        help="Choose custom port for containers. Port is not checked, if containers are already running, doxycannon will crash")
+
     vpn_group = vpn_cmd.add_mutually_exclusive_group()
     vpn_group.add_argument(
         '--up',
@@ -474,7 +525,7 @@ def handle_tor(args):
     elif args.up:
         tor(args.nodes)
     elif args.down:
-        down(TOR)
+        down(TOR, None)
     elif args.single:
         single(TOR, nodes=args.nodes)
 
@@ -485,9 +536,9 @@ def handle_vpn(args):
     elif args.build:
         build(IMAGE)
     elif args.up:
-        up(IMAGE, args.dir)
+        up(IMAGE, args.dir, args.port)
     elif args.down:
-        down(IMAGE)
+        down(IMAGE, args.dir)
     elif args.single:
         single(IMAGE, conf=args.dir)
     elif args.interactive:
