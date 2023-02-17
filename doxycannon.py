@@ -230,6 +230,7 @@ def multistart(image, jobs, ports, running_container_list):
                 image,
                 auto_remove=True,
                 privileged=True,
+                sysctls={"net.ipv6.conf.all.disable_ipv6": 0},
                 ports={'1080/tcp': ('127.0.0.1', port)},
                 network=NET,
                 environment=[f"VPN={container_name}", f"VPNPATH=/{parent}"],
@@ -426,7 +427,7 @@ def get_parsed():
         default=False,
         dest='single',
         help='Start an HAProxy rotator on a single port. Useful for Burpsuite')
-    
+
     tor_cmd.add_argument(
         '--build',
         action='store_true',
